@@ -1,0 +1,109 @@
+Part#1
+docker build --tag python-django .
+docker run --publish 8000:8000 python-django
+
+Part#2
+docker-compose build
+docker-compose run --rm app django-admin startproject core .
+docker-compose up
+
+Part#3
+docker-compose build
+docker-compose run --rm app django-admin startproject core .
+docker-compose up
+docker exec -it django_container /bin/bash (this is for Buster)
+
+***************************************************************
+Info:
+PYTHONUNBUFFERED:
+Setting the non-empty value of PYTHONUNBUFFERED means
+that the python output is transmitted directly to the
+terminal without being buffered and that allows displaying
+the application’s output in real-time.
+
+Establecer el valor no vacío de PYTHONUNBUFFERED significa
+que la salida de Python se transmite directamente al
+terminal sin tener búfer y que permite mostrar
+la salida de la aplicación en tiempo real
+***************************************************************
+
+Part#4 Docker Compose | Django | PostgreSQL | Redis & Celery Baseline Configuration
+docker-compose build
+docker-compose run --rm app django-admin startproject core .
+
+############## Setup for Django ##################
+############# Connect DB Postgre #################
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME':'postgres',
+        'USER':'postgres',
+        'PASSWORD':'postgres',
+        'HOST':'db',
+        'PORT':5432,
+    }
+}
+####################################################
+#Luego levantar el servicio con:
+docker-compose up
+Observa lo siguiente:
+Error: Invalid value for '-A' / '--app':
+celery    | Unable to load celery application.
+celery    | Module 'core' has no attribute 'celery'
+#===================================================
+Corre en otra terminal para crear celery en django con Alpine:
+(this is for Alpine):
+docker exec -it django_app sh
+#===================================================
+#Crea una nueva App llamada app_celery
+python manage.py startapp app_celery
+#Borrar Views, Test y Models
+#####################################################
+#Crea en Core un nuevo archivo llamado celery.py:
+#==============  Code celery.py =====================
+import os
+from celery import Celery
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+app = Celery('core')
+app.config_from_object('django.conf:settings', namespace='CELERY')
+app.autodiscover_tasks()
+
+######################  settings.py Core   #####################
+CELERY_BROKER_URL = "redis://redis:6379"
+CELERY_RESULT_BACKEND = "redis://redis:6379"
+
+Install name new APP = 'app_celery',
+######################  __init__.py Core   #####################
+from __future__ import absolute_import, unicode_literals
+
+# This will make sure the app is always imported when
+# Django starts so that shared_task will use this app.
+
+'''Esto asegurará que celery siempre se importe cuando
+   Django se inicia, para que las tareas compartidas
+   usen esta aplicación correctamente.'''
+
+from .celery import app as celery_app
+
+__all__ = ('celery_app',)
+
+
+############### Setup Task  ################
+tasks.py dentro de app_celery:
+############################################
+from __future__ import absolute_import, unicode_literals
+from celery import shared_task
+
+@shared_task
+def add(x, y):
+    return x + y
+
+################ Testing Task ##################
+docker exec -it django_app sh
+#Run Celery Task
+    python manage.py shell
+    from app_celery.tasks import add
+    add.delay(40, 80)
+
+
